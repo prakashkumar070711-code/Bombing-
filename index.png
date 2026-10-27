@@ -1,0 +1,158 @@
+import os
+import re
+import time
+import asyncio
+from urllib.parse import urlparse
+
+from telegram import Update
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    ContextTypes,
+)
+
+TOKEN = os.getenv("BOT_TOKEN", "")
+START_TIME = time.time()
+
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = (
+        "☠️ RAVAN X BOT ☠️\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "🛡️ Cyber Security Assistant\n\n"
+        "/help - Commands dekho\n"
+        "/tools - Security tools\n"
+        "/url <link> - URL format check\n"
+        "/password <password> - Password strength\n"
+        "/status - Bot status\n"
+        "━━━━━━━━━━━━━━━━━━"
+    )
+    await update.message.reply_text(text)
+
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "☠️ RAVAN X COMMANDS\n\n"
+        "/start - Main menu\n"
+        "/help - Help menu\n"
+        "/tools - Available tools\n"
+        "/url <link> - URL format check\n"
+        "/password <password> - Strength check\n"
+        "/status - Uptime"
+    )
+
+
+async def tools(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "🛡️ SECURITY TOOLS\n\n"
+        "1. Suspicious URL format checker\n"
+        "2. Password strength checker\n"
+        "3. Bot uptime monitor\n\n"
+        "Note: URL format check kisi website ko "
+        "safe hone ki guarantee nahi deta."
+    )
+
+
+async def check_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("Use: /url https://example.com")
+        return
+
+    raw_url = context.args[0]
+    parsed = urlparse(raw_url)
+
+    if parsed.scheme not in ("http", "https") or not parsed.hostname:
+        await update.message.reply_text("⚠️ Invalid URL format.")
+        return
+
+    warnings = []
+
+    if parsed.scheme != "https":
+        warnings.append("HTTPS nahi hai.")
+
+    if parsed.username or parsed.password:
+        warnings.append("URL mein login-jaisi information hai.")
+
+    if parsed.hostname.startswith("xn--") or ".xn--" in parsed.hostname:
+        warnings.append("Internationalized domain name hai; carefully check karo.")
+
+    result = (
+        "🔎 URL FORMAT REPORT\n"
+        f"Domain: {parsed.hostname}\n"
+        f"Protocol: {parsed.scheme}\n"
+    )
+
+    if warnings:
+        result += "\n⚠️ Warnings:\n" + "\n".join(warnings)
+    else:
+        result += "\nKoi basic format warning nahi mili."
+
+    result += "\n\nYe check website ki safety verify nahi karta."
+    await update.message.reply_text(result)
+
+
+async def password_check(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text(
+            "Use: /password YourTestPassword\n"
+            "Apna asli password kabhi bot mein mat bhejna."
+        )
+        return
+
+    password = " ".join(context.args)
+
+    score = sum([
+        len(password) >= 12,
+        bool(re.search(r"[a-z]", password)),
+        bool(re.search(r"[A-Z]", password)),
+        bool(re.search(r"\d", password)),
+        bool(re.search(r"[^a-zA-Z0-9]", password)),
+    ])
+
+    if score <= 2:
+        result = "Weak — aur mazboot banao."
+    elif score <= 4:
+        result = "Moderate — aur improve kar sakte ho."
+    else:
+        result = "Good basic strength indicators."
+
+    await update.message.reply_text(
+        f"🔐 Password check: {result}\n"
+        "Ye sirf basic estimate hai, guarantee nahi.\n"
+        "Test ke liye hi fake password use karo."
+    )
+
+
+async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    uptime = int(time.time() - START_TIME)
+    hours, remainder = divmod(uptime, 3600)
+    minutes, seconds = divmod(remainder, 60)
+
+    await update.message.reply_text(
+        "☠️ RAVAN X STATUS\n"
+        "State: ONLINE\n"
+        f"Uptime: {hours}h {minutes}m {seconds}s"
+    )
+
+
+def main():
+    if not TOKEN:
+        raise RuntimeError(
+            "BOT_TOKEN environment variable set karo."
+        )
+
+    app = Application.builder().token(TOKEN).build()
+
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("help", help_command))
+    app.add_handler(CommandHandler("tools", tools))
+    app.add_handler(CommandHandler("url", check_url))
+    app.add_handler(CommandHandler("password", password_check))
+    app.add_handler(CommandHandler("status", status))
+
+    print("RAVAN X BOT started!")
+    app.run_polling()
+
+
+if __name__ == "__main__":
+    main()
